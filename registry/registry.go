@@ -25,11 +25,6 @@ func (k *kube) GetService(name string) ([]*registry.Service, error) {
 	return nil, nil
 }
 
-// GetService return all service instances in memory which aggregated according to service name.
-func (k *kube) ListService() (map[string][]*registry.Service, error) {
-	return nil, nil
-}
-
 // Watch creates a watcher according to the service name.
 func (k *kube) Watch(name string) (registry.Watcher, error) {
 	return newWatcher(k)
