@@ -1,35 +1,38 @@
 package main
 
 import (
-	"fmt"
-	"github.com/go-kratos/kube/config"
+	"github.com/go-kratos/kratos/v2/config"
+	kubeConfig "github.com/go-kratos/kube/config"
+	"k8s.io/client-go/util/homedir"
 	"log"
+	"path/filepath"
 )
 
+// 部署在mesh namespace 下configmap
+const Ayaml = `database:
+  mysql:
+    dsn: "root:Test@tcp(mysql.database.svc.cluster.local:3306)/test?timeout=1s&readTimeout=1s&writeTimeout=1s&parseTime=true&loc=Local&charset=utf8mb4,utf8"
+    active: 20
+    idle: 10
+    idle_timeout: 3600
+  redis:
+    addr: "redis-master.redis.svc.cluster.local:6379"
+    password: ""
+    db: 4`
+
+const Byaml = `application:
+  expire: 3600`
+
 func main() {
-	s := config.NewSource(config.SourceOption{
-		Namespace:     "mesh",
-		LabelSelector: "",
-	})
-	kvs, err := s.Load()
+	conf := config.New(config.WithSource(
+		kubeConfig.NewSource(kubeConfig.SourceOption{
+			Namespace:     "mesh",
+			LabelSelector: "app=test",
+			KubeConfig: filepath.Join(homedir.HomeDir(), ".kube", "config"),
+		})),
+	)
+	err := conf.Load()
 	if err != nil {
 		log.Panic(err)
-	}
-	for _, v := range kvs {
-		log.Println(v)
-	}
-	watcher, err := s.Watch()
-	if err != nil {
-		log.Panic(err)
-	}
-	for {
-		kvs, err = watcher.Next()
-		if err == nil {
-			for _, v := range kvs {
-				log.Println(v)
-			}
-		} else {
-			fmt.Println(err)
-		}
 	}
 }
