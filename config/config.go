@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/go-kratos/kratos/v2/config/source"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,8 +13,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// New SourceOption
-type SourceOption struct {
+// Option is kube option.
+type Option func(*options)
+
+type options struct {
 	// kube namespace
 	Namespace string
 	// kube labelSelector example `app=test`
@@ -22,25 +25,65 @@ type SourceOption struct {
 	FieldSelector string
 	// set KubeConfig out-of-cluster Use outside cluster
 	KubeConfig string
+	// set master url
+	Master string
+}
+
+// Namespace with kube namespace.
+func Namespace(ns string) Option {
+	return func(o *options) {
+		o.Namespace = ns
+	}
+}
+
+// LabelSelector with kube label selector.
+func LabelSelector(label string) Option {
+	return func(o *options) {
+		o.LabelSelector = label
+	}
+}
+
+// FieldSelector with kube field selector.
+func FieldSelector(field string) Option {
+	return func(o *options) {
+		o.FieldSelector = field
+	}
+}
+
+// KubeConfig with kube config.
+func KubeConfig(config string) Option {
+	return func(o *options) {
+		o.KubeConfig = config
+	}
+}
+
+// Master with kube master.
+func Master(master string) Option {
+	return func(o *options) {
+		o.Master = master
+	}
 }
 
 type kube struct {
-	op     SourceOption
+	opts   options
 	client *kubernetes.Clientset
 }
 
 // NewSource new a kube config source.
-func NewSource(op SourceOption) source.Source {
+func NewSource(opts ...Option) source.Source {
+	options := options{}
+	for _, o := range opts {
+		o(&options)
+	}
 	return &kube{
-		op: op,
+		opts: options,
 	}
 }
 
-// init kube client
-func (k *kube) initKubeClient() (err error) {
+func (k *kube) init() (err error) {
 	var config *rest.Config
-	if k.op.KubeConfig != "" {
-		if config, err = clientcmd.BuildConfigFromFlags("", k.op.KubeConfig); err != nil {
+	if k.opts.KubeConfig != "" {
+		if config, err = clientcmd.BuildConfigFromFlags(k.opts.Master, k.opts.KubeConfig); err != nil {
 			return err
 		}
 	} else {
@@ -48,34 +91,34 @@ func (k *kube) initKubeClient() (err error) {
 			return err
 		}
 	}
-	k.client, err = kubernetes.NewForConfig(config)
-	if err != nil {
+	if k.client, err = kubernetes.NewForConfig(config); err != nil {
 		return err
 	}
 	return nil
 }
 
-// loadKubeConfig
-func (k *kube) loadKubeConfig() (kvs []*source.KeyValue, err error) {
-	cmList, err := k.client.CoreV1().ConfigMaps(k.op.Namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: k.op.LabelSelector,
-		FieldSelector: k.op.FieldSelector,
-	})
+func (k *kube) load() (kvs []*source.KeyValue, err error) {
+	cmList, err := k.client.
+		CoreV1().
+		ConfigMaps(k.opts.Namespace).
+		List(context.Background(), metav1.ListOptions{
+			LabelSelector: k.opts.LabelSelector,
+			FieldSelector: k.opts.FieldSelector,
+		})
 	if err != nil {
 		return nil, err
 	}
 	for _, cm := range cmList.Items {
-		kvs = append(kvs, k.configMapKV(cm)...)
+		kvs = append(kvs, k.configMap(cm)...)
 	}
 	return kvs, nil
 }
 
-// configMapKV
-func (k *kube) configMapKV(cm v1.ConfigMap) (kvs []*source.KeyValue) {
+func (k *kube) configMap(cm v1.ConfigMap) (kvs []*source.KeyValue) {
 	for name, val := range cm.Data {
 		kvs = append(kvs, &source.KeyValue{
-			Key:       fmt.Sprintf("%s/%s/%s", k.op.Namespace, cm.Name, name),
-			Value:     string2byte(val),
+			Key:       fmt.Sprintf("%s/%s/%s", k.opts.Namespace, cm.Name, name),
+			Value:     []byte(val),
 			Format:    format(name),
 			Timestamp: cm.GetCreationTimestamp().Time,
 		})
@@ -85,13 +128,13 @@ func (k *kube) configMapKV(cm v1.ConfigMap) (kvs []*source.KeyValue) {
 
 // Load
 func (k *kube) Load() ([]*source.KeyValue, error) {
-	if k.op.Namespace == "" {
-		return nil, errors.New("SourceOption namespace not full")
+	if k.opts.Namespace == "" {
+		return nil, errors.New("options namespace not full")
 	}
-	if err := k.initKubeClient(); err != nil {
+	if err := k.init(); err != nil {
 		return nil, err
 	}
-	return k.loadKubeConfig()
+	return k.load()
 }
 
 // Watch
