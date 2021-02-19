@@ -11,17 +11,17 @@ func NewRegistry() registry.Registry {
 }
 
 // Register the registration.
-func (k *kube) Register(service *registry.Service) error {
+func (k *kube) Register(service *registry.ServiceInstance) error {
 	return nil
 }
 
 // Deregister the registration.
-func (k *kube) Deregister(service *registry.Service) error {
+func (k *kube) Deregister(service *registry.ServiceInstance) error {
 	return nil
 }
 
-// GetService return the service instances in memory according to the service name.
-func (k *kube) GetService(name string) ([]*registry.Service, error) {
+// Service return the service instances in memory according to the service name.
+func (k *kube) Service(name string) ([]*registry.ServiceInstance, error) {
 	return nil, nil
 }
 
