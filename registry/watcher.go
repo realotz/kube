@@ -11,7 +11,7 @@ func newWatcher(k *kube) (registry.Watcher, error) {
 	return &watcher{}, nil
 }
 
-func (w *watcher) Next() ([]*registry.Service, error) {
+func (w *watcher) Next() ([]*registry.ServiceInstance, error) {
 	return nil, nil
 }
 

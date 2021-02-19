@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-kratos/kratos/v2/config/source"
+	"github.com/go-kratos/kratos/v2/config"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -17,7 +17,7 @@ type watcher struct {
 	watcher watch.Interface
 }
 
-func newWatcher(k *kube) (source.Watcher, error) {
+func newWatcher(k *kube) (config.Watcher, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	w, err := k.client.CoreV1().ConfigMaps(k.opts.Namespace).Watch(ctx, metav1.ListOptions{
 		LabelSelector: k.opts.LabelSelector,
@@ -35,7 +35,7 @@ func newWatcher(k *kube) (source.Watcher, error) {
 	}, nil
 }
 
-func (w *watcher) Next() ([]*source.KeyValue, error) {
+func (w *watcher) Next() ([]*config.KeyValue, error) {
 	ch := <-w.watcher.ResultChan()
 	if ch.Object == nil {
 		return nil, fmt.Errorf("kube config watcher close")

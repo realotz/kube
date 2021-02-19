@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-kratos/kratos/v2/config/source"
+	"github.com/go-kratos/kratos/v2/config"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -70,7 +70,7 @@ type kube struct {
 }
 
 // NewSource new a kube config source.
-func NewSource(opts ...Option) source.Source {
+func NewSource(opts ...Option) config.Source {
 	options := options{}
 	for _, o := range opts {
 		o(&options)
@@ -97,7 +97,7 @@ func (k *kube) init() (err error) {
 	return nil
 }
 
-func (k *kube) load() (kvs []*source.KeyValue, err error) {
+func (k *kube) load() (kvs []*config.KeyValue, err error) {
 	cmList, err := k.client.
 		CoreV1().
 		ConfigMaps(k.opts.Namespace).
@@ -114,20 +114,17 @@ func (k *kube) load() (kvs []*source.KeyValue, err error) {
 	return kvs, nil
 }
 
-func (k *kube) configMap(cm v1.ConfigMap) (kvs []*source.KeyValue) {
+func (k *kube) configMap(cm v1.ConfigMap) (kvs []*config.KeyValue) {
 	for name, val := range cm.Data {
-		kvs = append(kvs, &source.KeyValue{
-			Key:       fmt.Sprintf("%s/%s/%s", k.opts.Namespace, cm.Name, name),
-			Value:     []byte(val),
-			Format:    format(name),
-			Timestamp: cm.GetCreationTimestamp().Time,
+		kvs = append(kvs, &config.KeyValue{
+			Key:   fmt.Sprintf("%s/%s/%s", k.opts.Namespace, cm.Name, name),
+			Value: []byte(val),
 		})
 	}
 	return kvs
 }
 
-// Load
-func (k *kube) Load() ([]*source.KeyValue, error) {
+func (k *kube) Load() ([]*config.KeyValue, error) {
 	if k.opts.Namespace == "" {
 		return nil, errors.New("options namespace not full")
 	}
@@ -137,7 +134,6 @@ func (k *kube) Load() ([]*source.KeyValue, error) {
 	return k.load()
 }
 
-// Watch
-func (k *kube) Watch() (source.Watcher, error) {
+func (k *kube) Watch() (config.Watcher, error) {
 	return newWatcher(k)
 }
