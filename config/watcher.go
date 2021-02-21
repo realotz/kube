@@ -34,14 +34,14 @@ ResultChan:
 	ch := <-w.watcher.ResultChan()
 	if ch.Object == nil {
 		// 重新获取watcher
-		var err error
-		w.watcher, err = w.k.client.CoreV1().ConfigMaps(w.k.opts.Namespace).Watch(context.Background(), metav1.ListOptions{
+		k8sWatcher, err := w.k.client.CoreV1().ConfigMaps(w.k.opts.Namespace).Watch(context.Background(), metav1.ListOptions{
 			LabelSelector: w.k.opts.LabelSelector,
 			FieldSelector: w.k.opts.FieldSelector,
 		})
 		if err != nil {
 			return nil, err
 		}
+		w.watcher = k8sWatcher
 		goto ResultChan
 	}
 	cm, ok := ch.Object.(*v1.ConfigMap)
