@@ -46,7 +46,7 @@ ResultChan:
 	}
 	cm, ok := ch.Object.(*v1.ConfigMap)
 	if !ok {
-		return nil, fmt.Errorf("kube Object not ConfigMap %s", cm.Name)
+		return nil, fmt.Errorf("kube Object not ConfigMap")
 	}
 	if ch.Type == "DELETED" {
 		return nil, fmt.Errorf("kube configmap delete %s", cm.Name)
