@@ -12,35 +12,42 @@ import (
 
 type watcher struct {
 	k       *kube
-	ctx     context.Context
-	cancel  context.CancelFunc
 	watcher watch.Interface
 }
 
 func newWatcher(k *kube) (config.Watcher, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	w, err := k.client.CoreV1().ConfigMaps(k.opts.Namespace).Watch(ctx, metav1.ListOptions{
+	w, err := k.client.CoreV1().ConfigMaps(k.opts.Namespace).Watch(context.Background(), metav1.ListOptions{
 		LabelSelector: k.opts.LabelSelector,
 		FieldSelector: k.opts.FieldSelector,
 	})
 	if err != nil {
-		cancel()
 		return nil, err
 	}
 	return &watcher{
 		k:       k,
 		watcher: w,
-		ctx:     ctx,
-		cancel:  cancel,
 	}, nil
 }
 
 func (w *watcher) Next() ([]*config.KeyValue, error) {
+ResultChan:
 	ch := <-w.watcher.ResultChan()
 	if ch.Object == nil {
-		return nil, fmt.Errorf("kube config watcher close")
+		// 重新获取watcher
+		k8sWatcher, err := w.k.client.CoreV1().ConfigMaps(w.k.opts.Namespace).Watch(context.Background(), metav1.ListOptions{
+			LabelSelector: w.k.opts.LabelSelector,
+			FieldSelector: w.k.opts.FieldSelector,
+		})
+		if err != nil {
+			return nil, err
+		}
+		w.watcher = k8sWatcher
+		goto ResultChan
 	}
-	cm := ch.Object.(*v1.ConfigMap)
+	cm, ok := ch.Object.(*v1.ConfigMap)
+	if !ok {
+		return nil, fmt.Errorf("kube Object not ConfigMap")
+	}
 	if ch.Type == "DELETED" {
 		return nil, fmt.Errorf("kube configmap delete %s", cm.Name)
 	}
@@ -48,6 +55,6 @@ func (w *watcher) Next() ([]*config.KeyValue, error) {
 }
 
 func (w *watcher) Close() error {
-	w.cancel()
+	w.watcher.Stop()
 	return nil
 }
